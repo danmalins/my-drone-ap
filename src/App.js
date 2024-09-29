@@ -16,11 +16,11 @@ function App() {
     if (droneStatus === 'Flying') {
       const interval = setInterval(() => {
         setFuelLevel(prev => Math.max(prev - 0.1, 0));
-        setAltitude(prev => prev + 1);
-        setLatitude(prev => prev + 0.0001);
-        setLongitude(prev => prev + 0.0001);
-        setSpeed(50 + Math.random() * 10);
-        setDirection(prev => (prev + 1) % 360);
+        
+        // Update position based on speed and direction
+        const radians = direction * Math.PI / 180;
+        setLatitude(prev => prev + Math.cos(radians) * speed / 100000);
+        setLongitude(prev => prev + Math.sin(radians) * speed / 100000);
 
         if (Math.random() < 0.01) {
           const newWeather = ['Ясно', 'Облачно', 'Ветрено', 'Дождливо'][Math.floor(Math.random() * 4)];
@@ -36,7 +36,49 @@ function App() {
 
       return () => clearInterval(interval);
     }
-  }, [droneStatus, fuelLevel]);
+  }, [droneStatus, fuelLevel, speed, direction]);
+
+  useEffect(() => {
+    const handleKeyPress = (event) => {
+      if (droneStatus !== 'Flying') return;
+      
+      event.preventDefault(); // Предотвращаем прокрутку страницы
+
+      switch(event.key.toLowerCase()) {
+        case 'w':
+          setAltitude(prev => Math.min(prev + 10, 1000));
+          addEvent('Увеличение высоты');
+          break;
+        case 's':
+          setAltitude(prev => Math.max(prev - 10, 0));
+          addEvent('Снижение высоты');
+          break;
+        case 'a':
+          setDirection(prev => (prev - 10 + 360) % 360);
+          addEvent('Поворот влево');
+          break;
+        case 'd':
+          setDirection(prev => (prev + 10) % 360);
+          addEvent('Поворот вправо');
+          break;
+        case 'arrowup':
+          setSpeed(prev => Math.min(prev + 5, 100));
+          addEvent('Увеличение скорости');
+          break;
+        case 'arrowdown':
+          setSpeed(prev => Math.max(prev - 5, 0));
+          addEvent('Уменьшение скорости');
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [droneStatus, altitude, speed]);
 
   const takeOff = () => {
     setDroneStatus('Flying');
@@ -57,20 +99,21 @@ function App() {
 
 return (
   <div className="app-container">
-    <header className="app-header">
-      <h1>Тренажер оператора БПЛА</h1>
-    </header>
-    <main className="app-main">
-      <section className="drone-visualization">
-        <div className="sky">
-          <div 
-            className="drone" 
-            style={{
-              bottom: `${altitude / 10}%`,
-              left: `${(longitude % 1) * 100}%`,
-              transform: `rotate(${direction}deg)`
-            }}
-          ></div>
+      <header className="app-header">
+        <h1>Тренажер оператора БПЛА</h1>
+      </header>
+      <main className="app-main">
+        <section className="drone-visualization">
+          <div className="sky">
+            <div 
+              className="drone" 
+              style={{
+                bottom: `${altitude / 10}%`,
+                left: `${(longitude % 1) * 100}%`,
+                transform: `rotate(${direction}deg)`
+              }}
+            ></div>
+            <div className="ground"></div>
         </div>
       </section>
       <section className="control-panel">

@@ -27,6 +27,7 @@
   border-radius: 8px;
   position: relative;
   overflow: hidden;
+  height: 400px; /* Увеличиваем высоту немного */
 }
 
 .sky {
@@ -34,16 +35,16 @@
   height: 100%;
   position: relative;
   background: linear-gradient(to bottom, #87CEEB 0%, #E0F6FF 100%);
-  overflow: hidden;
 }
 
 .drone {
   width: 40px;
   height: 40px;
-  background-color: #333;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M50 10 L90 90 L50 70 L10 90 Z" fill="%23333"/><circle cx="50" cy="50" r="10" fill="%23666"/></svg>');
+  background-size: contain;
+  background-repeat: no-repeat;
   position: absolute;
   transition: all 0.5s ease;
-  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
 }
 
 .ground {
