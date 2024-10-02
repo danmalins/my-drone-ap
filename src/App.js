@@ -11,32 +11,104 @@ function App() {
   const [direction, setDirection] = useState(0);
   const [weather, setWeather] = useState('Ясно');
   const [events, setEvents] = useState([]);
+  const [obstacles, setObstacles] = useState([]);
+  const [circles, setCircles] = useState([]);
+  const [collectedCircles, setCollectedCircles] = useState(0);
+  const [isExerciseComplete, setIsExerciseComplete] = useState(false);
+
+  useEffect(() => {
+    const newCircles = [
+      { id: 0, x: 10, y: 100, collected: false },
+      { id: 1, x: 30, y: 150, collected: false },
+      { id: 2, x: 50, y: 200, collected: false },
+      { id: 3, x: 70, y: 150, collected: false },
+      { id: 4, x: 90, y: 100, collected: false }
+    ];
+    setCircles(newCircles);
+  }, []);
+
+  useEffect(() => {
+    const checkCollision = () => {
+      circles.forEach((circle, index) => {
+        if (!circle.collected &&
+            Math.abs(circle.x - longitude) < 5 &&
+            Math.abs(circle.y - altitude) < 10) {
+          const updatedCircles = [...circles];
+          updatedCircles[index].collected = true;
+          setCircles(updatedCircles);
+          setCollectedCircles(prev => prev + 1);
+        }
+      });
+    };
+  
+    checkCollision();
+  
+  }, [longitude, altitude, circles]);
+
+  useEffect(() => {
+    if (collectedCircles === circles.length && circles.length > 0) {
+      setIsExerciseComplete(true);
+      addEvent('Упражнение завершено! Все кружки собраны.');
+    }
+  }, [collectedCircles, circles]);
+
+  useEffect(() => {
+    // Генерируем случайные препятствия при монтировании компонента
+    const newObstacles = [];
+    for (let i = 0; i < 5; i++) {
+      newObstacles.push({
+        type: 'tree',
+        style: {
+          left: `${Math.random() * 90}%`,
+        }
+      });
+    }
+    setObstacles(newObstacles);
+  }, []);
 
   useEffect(() => {
     if (droneStatus === 'Flying') {
       const interval = setInterval(() => {
-        setFuelLevel(prev => Math.max(prev - 0.1, 0));
+        setFuelLevel(prev => Math.max(prev - 0.02, 0)); // Уменьшаем расход топлива
         
-        // Update position based on speed and direction
+        // Остальная логика движения дрона
         const radians = direction * Math.PI / 180;
-        setLatitude(prev => prev + Math.cos(radians) * speed / 100000);
-        setLongitude(prev => prev + Math.sin(radians) * speed / 100000);
-
-        if (Math.random() < 0.01) {
-          const newWeather = ['Ясно', 'Облачно', 'Ветрено', 'Дождливо'][Math.floor(Math.random() * 4)];
-          setWeather(newWeather);
-          addEvent(`Погода изменилась на ${newWeather}`);
-        }
-
+        setLatitude(prev => prev + Math.cos(radians) * speed / 1000);
+        setLongitude(prev => {
+          const newLong = prev + Math.sin(radians) * speed / 1000;
+          return ((newLong % 100) + 100) % 100;
+        });
+  
+        // Проверка столкновений с кружками
+        circles.forEach((circle, index) => {
+          if (!circle.collected &&
+              Math.abs(circle.x - longitude) < 3 &&
+              Math.abs(circle.y - altitude) < 3) {
+            const updatedCircles = [...circles];
+            updatedCircles[index].collected = true;
+            setCircles(updatedCircles);
+            setCollectedCircles(prev => prev + 1);
+            addEvent(`Собран кружок ${index + 1}`);
+          }
+        });
+  
         if (fuelLevel <= 0) {
           land();
           addEvent('Аварийная посадка: закончилось топливо');
         }
-      }, 1000);
-
+      }, 50);
+  
       return () => clearInterval(interval);
     }
-  }, [droneStatus, fuelLevel, speed, direction]);
+  }, [droneStatus, fuelLevel, speed, direction, longitude, altitude, circles]);
+
+  // Обновляем эффект для проверки завершения упражнения
+useEffect(() => {
+  if (collectedCircles === circles.length && circles.length > 0) {
+    setIsExerciseComplete(true);
+    addEvent('Упражнение завершено! Все кружки собраны.');
+  }
+}, [collectedCircles, circles]);
 
   useEffect(() => {
     const handleKeyPress = (event) => {
@@ -92,10 +164,41 @@ function App() {
     addEvent('Посадка');
   };
 
+  const Obstacle = ({ type, style }) => (
+    <div className={`obstacle ${type}`} style={style}></div>
+  );
+
   const addEvent = (event) => {
     setEvents(prev => [`${new Date().toLocaleTimeString()}: ${event}`, ...prev.slice(0, 4)]);
   };
 
+  const Tree = () => (
+    <div className="absolute w-8 h-12" style={{bottom: '25%'}}>
+      <div className="w-0 h-0 border-l-8 border-r-8 border-b-16 border-l-transparent border-r-transparent border-b-green-700"></div>
+      <div className="w-2 h-4 bg-brown-600 mx-auto"></div>
+    </div>
+  );
+
+  const AltitudeScale = () => {
+    const marks = [250, 200, 150, 100, 50];
+    return (
+      <div className="altitude-scale">
+        {marks.map(mark => (
+          <div key={mark} className="altitude-mark">{mark}м</div>
+        ))}
+      </div>
+    );
+  };
+
+  const CompletionMessage = ({ isComplete }) => {
+    if (!isComplete) return null;
+    
+    return (
+      <div className="completion-message">
+        Поздравляем! Вы собрали все кружки!
+      </div>
+    );
+  };
 
 return (
   <div className="app-container">
@@ -103,19 +206,35 @@ return (
         <h1>Тренажер оператора БПЛА</h1>
       </header>
       <main className="app-main">
-        <section className="drone-visualization">
-          <div className="sky">
-            <div 
-              className="drone" 
-              style={{
-                bottom: `${altitude / 10}%`,
-                left: `${(longitude % 1) * 100}%`,
-                transform: `rotate(${direction}deg)`
-              }}
-            ></div>
-            <div className="ground"></div>
-        </div>
-      </section>
+      <section className="drone-visualization">
+      <AltitudeScale />
+      <div 
+        className="drone" 
+        style={{
+          bottom: `${(altitude / 200) * 75}%`,
+          left: `${longitude}%`,
+          transform: `rotate(${direction}deg)`
+        }}
+      ></div>
+          {circles.map((circle) => (
+      <div
+        key={circle.id}
+        className={`circle ${circle.collected ? 'circle-collected' : 'circle-uncollected'}`}
+        style={{
+          bottom: `${(circle.y / 200) * 80}%`,
+          left: `${circle.x}%`
+        }}
+      ></div>
+      ))}
+      {obstacles.map((obstacle, index) => (
+        <div
+          key={index}
+          className={`obstacle ${obstacle.type}`}
+          style={obstacle.style}
+        />
+      ))}
+     <div className="ground"></div>
+        </section>
       <section className="control-panel">
         <div className="status-indicators">
           <p>Статус: <span className={`status-${droneStatus.toLowerCase()}`}>{droneStatus}</span></p>
@@ -139,6 +258,7 @@ return (
           ))}
         </ul>
       </section>
+      <CompletionMessage isComplete={isExerciseComplete} />
     </main>
   </div>
 );
